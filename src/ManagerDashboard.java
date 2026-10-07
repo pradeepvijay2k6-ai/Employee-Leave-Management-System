@@ -13,7 +13,10 @@ import java.sql.SQLException;
 
 /**
  * ManagerDashboard.java
- * Modernized Manager Dashboard for reviewing, approving, and rejecting leave applications.
+ * Modern Manager Dashboard for:
+ * 1. Reviewing and processing pending leave requests with ACID transactions.
+ * 2. Viewing decision history.
+ * 3. Viewing team members and adding new employees with automatic leave quota initialization.
  */
 public class ManagerDashboard extends JFrame {
 
@@ -25,9 +28,12 @@ public class ManagerDashboard extends JFrame {
     private DefaultTableModel pendingModel;
     private JTable processedTable;
     private DefaultTableModel processedModel;
+    private JTable employeeTable;
+    private DefaultTableModel employeeModel;
 
     private JButton approveButton;
     private JButton rejectButton;
+    private JButton addEmployeeButton;
     private JButton refreshButton;
     private JButton logoutButton;
 
@@ -36,7 +42,7 @@ public class ManagerDashboard extends JFrame {
         this.managerName = managerName;
 
         setTitle("Manager Portal - " + managerName);
-        setSize(1040, 640);
+        setSize(1080, 680);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         getContentPane().setBackground(new Color(248, 250, 252));
@@ -62,7 +68,7 @@ public class ManagerDashboard extends JFrame {
         welcomeLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
         welcomeLabel.setForeground(Color.WHITE);
 
-        JLabel subInfoLabel = new JLabel("Manager ID: #" + managerId + "  |  Department Management & Leave Approvals");
+        JLabel subInfoLabel = new JLabel("Manager ID: #" + managerId + "  |  Team Management & Leave Approvals");
         subInfoLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         subInfoLabel.setForeground(new Color(148, 163, 184)); // Slate 400
 
@@ -70,14 +76,26 @@ public class ManagerDashboard extends JFrame {
         profileInfo.add(subInfoLabel);
         headerCard.add(profileInfo, BorderLayout.WEST);
 
+        // Header Action: Add Employee quick button
+        addEmployeeButton = new JButton("+ Add Employee");
+        addEmployeeButton.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        addEmployeeButton.setBackground(new Color(16, 185, 129)); // Emerald Green
+        addEmployeeButton.setForeground(Color.WHITE);
+        addEmployeeButton.setOpaque(true);
+        addEmployeeButton.setBorderPainted(false);
+        addEmployeeButton.setFocusPainted(false);
+        addEmployeeButton.setPreferredSize(new Dimension(150, 38));
+        addEmployeeButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        headerCard.add(addEmployeeButton, BorderLayout.EAST);
+
         mainPanel.add(headerCard, BorderLayout.NORTH);
 
-        // 2. Center Tabbed Card
+        // 2. Center Tabbed Pane
         tabbedPane = new JTabbedPane();
         tabbedPane.setFont(new Font("Segoe UI", Font.BOLD, 13));
         tabbedPane.setBackground(Color.WHITE);
 
-        // TAB 1: Pending Requests
+        // ---------------- TAB 1: Pending Requests ----------------
         JPanel pendingPanel = new JPanel(new BorderLayout(0, 12));
         pendingPanel.setBackground(Color.WHITE);
         pendingPanel.setBorder(new EmptyBorder(15, 15, 15, 15));
@@ -123,7 +141,7 @@ public class ManagerDashboard extends JFrame {
 
         approveButton = new JButton("✓ Approve Leave");
         approveButton.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        approveButton.setBackground(new Color(16, 185, 129)); // Emerald Green
+        approveButton.setBackground(new Color(16, 185, 129));
         approveButton.setForeground(Color.WHITE);
         approveButton.setOpaque(true);
         approveButton.setBorderPainted(false);
@@ -133,7 +151,7 @@ public class ManagerDashboard extends JFrame {
 
         rejectButton = new JButton("✕ Reject Leave");
         rejectButton.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        rejectButton.setBackground(new Color(220, 38, 38)); // Crimson Red
+        rejectButton.setBackground(new Color(220, 38, 38));
         rejectButton.setForeground(Color.WHITE);
         rejectButton.setOpaque(true);
         rejectButton.setBorderPainted(false);
@@ -147,7 +165,7 @@ public class ManagerDashboard extends JFrame {
 
         tabbedPane.addTab("  ⏳ Pending Requests  ", pendingPanel);
 
-        // TAB 2: Processed History
+        // ---------------- TAB 2: Processed History ----------------
         JPanel processedPanel = new JPanel(new BorderLayout(0, 12));
         processedPanel.setBackground(Color.WHITE);
         processedPanel.setBorder(new EmptyBorder(15, 15, 15, 15));
@@ -197,6 +215,44 @@ public class ManagerDashboard extends JFrame {
 
         tabbedPane.addTab("  📋 Decision History  ", processedPanel);
 
+        // ---------------- TAB 3: Team Members ----------------
+        JPanel teamPanel = new JPanel(new BorderLayout(0, 12));
+        teamPanel.setBackground(Color.WHITE);
+        teamPanel.setBorder(new EmptyBorder(15, 15, 15, 15));
+
+        String[] empCols = {"Emp ID", "Full Name", "Email Address", "Department", "Casual Rem.", "Sick Rem.", "Earned Rem."};
+        employeeModel = new DefaultTableModel(empCols, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+
+        employeeTable = new JTable(employeeModel);
+        employeeTable.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        employeeTable.setRowHeight(32);
+        employeeTable.setShowVerticalLines(false);
+        employeeTable.setGridColor(new Color(241, 245, 249));
+
+        employeeTable.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 12));
+        employeeTable.getTableHeader().setBackground(new Color(30, 41, 59));
+        employeeTable.getTableHeader().setForeground(Color.WHITE);
+        employeeTable.getTableHeader().setPreferredSize(new Dimension(0, 34));
+
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+        employeeTable.getColumnModel().getColumn(0).setMaxWidth(80);
+        employeeTable.getColumnModel().getColumn(0).setCellRenderer(centerRenderer);
+        employeeTable.getColumnModel().getColumn(4).setCellRenderer(centerRenderer);
+        employeeTable.getColumnModel().getColumn(5).setCellRenderer(centerRenderer);
+        employeeTable.getColumnModel().getColumn(6).setCellRenderer(centerRenderer);
+
+        JScrollPane empScroll = new JScrollPane(employeeTable);
+        empScroll.setBorder(new LineBorder(new Color(226, 232, 240), 1));
+        teamPanel.add(empScroll, BorderLayout.CENTER);
+
+        tabbedPane.addTab("  👥 My Team Employees  ", teamPanel);
+
         mainPanel.add(tabbedPane, BorderLayout.CENTER);
 
         // 3. Bottom Global Controls
@@ -229,7 +285,7 @@ public class ManagerDashboard extends JFrame {
 
         add(mainPanel);
 
-        // Handlers
+        // Event Handlers
         approveButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -241,6 +297,13 @@ public class ManagerDashboard extends JFrame {
             @Override
             public void actionPerformed(ActionEvent e) {
                 processLeaveRequest(false);
+            }
+        });
+
+        addEmployeeButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                showAddEmployeeDialog();
             }
         });
 
@@ -263,6 +326,7 @@ public class ManagerDashboard extends JFrame {
     private void loadAllData() {
         loadPendingRequests();
         loadProcessedRequests();
+        loadTeamEmployees();
     }
 
     private void loadPendingRequests() {
@@ -339,6 +403,40 @@ public class ManagerDashboard extends JFrame {
             }
         } catch (SQLException ex) {
             JOptionPane.showMessageDialog(this, "Error loading history: " + ex.getMessage(), "Database Error", JOptionPane.ERROR_MESSAGE);
+            ex.printStackTrace();
+        }
+    }
+
+    private void loadTeamEmployees() {
+        employeeModel.setRowCount(0);
+
+        String sql = "SELECT e.employee_id, e.name, e.email, e.department, " +
+                     "NVL((SELECT remaining_days FROM LEAVE_BALANCE WHERE employee_id = e.employee_id AND leave_type_id = 1), 0) AS casual_rem, " +
+                     "NVL((SELECT remaining_days FROM LEAVE_BALANCE WHERE employee_id = e.employee_id AND leave_type_id = 2), 0) AS sick_rem, " +
+                     "NVL((SELECT remaining_days FROM LEAVE_BALANCE WHERE employee_id = e.employee_id AND leave_type_id = 3), 0) AS earned_rem " +
+                     "FROM EMPLOYEE e " +
+                     "WHERE e.manager_id = ? " +
+                     "ORDER BY e.employee_id ASC";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, managerId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    employeeModel.addRow(new Object[]{
+                            rs.getInt("employee_id"),
+                            rs.getString("name"),
+                            rs.getString("email"),
+                            rs.getString("department"),
+                            rs.getInt("casual_rem") + " days",
+                            rs.getInt("sick_rem") + " days",
+                            rs.getInt("earned_rem") + " days"
+                    });
+                }
+            }
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Error loading team employees: " + ex.getMessage(), "Database Error", JOptionPane.ERROR_MESSAGE);
             ex.printStackTrace();
         }
     }
@@ -482,5 +580,195 @@ public class ManagerDashboard extends JFrame {
                 }
             } catch (SQLException ignored) {}
         }
+    }
+
+    /**
+     * Opens modal dialog to register a new employee under this manager
+     * and automatically initialize their leave balances via a transaction.
+     */
+    private void showAddEmployeeDialog() {
+        JDialog dialog = new JDialog(this, "Add New Employee", true);
+        dialog.setSize(480, 420);
+        dialog.setLocationRelativeTo(this);
+        dialog.setResizable(false);
+
+        JPanel content = new JPanel(new BorderLayout(0, 16));
+        content.setBackground(new Color(248, 250, 252));
+        content.setBorder(new EmptyBorder(20, 25, 20, 25));
+
+        JLabel title = new JLabel("Register New Team Member");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        title.setForeground(new Color(15, 23, 42));
+        content.add(title, BorderLayout.NORTH);
+
+        JPanel form = new JPanel(new GridLayout(4, 2, 10, 12));
+        form.setBackground(Color.WHITE);
+        form.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(new Color(226, 232, 240), 1, true),
+                new EmptyBorder(16, 16, 16, 16)
+        ));
+
+        JTextField nameField = new JTextField();
+        JTextField emailField = new JTextField();
+        JPasswordField passField = new JPasswordField();
+        JComboBox<String> deptBox = new JComboBox<>(new String[]{"Engineering", "Human Resources", "Finance", "Marketing", "Operations", "Quality Assurance"});
+        deptBox.setBackground(Color.WHITE);
+
+        form.add(new JLabel("Full Name:"));
+        form.add(nameField);
+        form.add(new JLabel("Email Address:"));
+        form.add(emailField);
+        form.add(new JLabel("Password:"));
+        form.add(passField);
+        form.add(new JLabel("Department:"));
+        form.add(deptBox);
+
+        content.add(form, BorderLayout.CENTER);
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
+        btnPanel.setBackground(new Color(248, 250, 252));
+
+        JButton saveBtn = new JButton("Add Employee");
+        saveBtn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        saveBtn.setBackground(new Color(16, 185, 129));
+        saveBtn.setForeground(Color.WHITE);
+        saveBtn.setOpaque(true);
+        saveBtn.setBorderPainted(false);
+        saveBtn.setFocusPainted(false);
+        saveBtn.setPreferredSize(new Dimension(140, 36));
+        saveBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        JButton cancelBtn = new JButton("Cancel");
+        cancelBtn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        cancelBtn.setBackground(new Color(100, 116, 139));
+        cancelBtn.setForeground(Color.WHITE);
+        cancelBtn.setOpaque(true);
+        cancelBtn.setBorderPainted(false);
+        cancelBtn.setFocusPainted(false);
+        cancelBtn.setPreferredSize(new Dimension(90, 36));
+        cancelBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        btnPanel.add(saveBtn);
+        btnPanel.add(cancelBtn);
+        content.add(btnPanel, BorderLayout.SOUTH);
+
+        cancelBtn.addActionListener(e -> dialog.dispose());
+
+        saveBtn.addActionListener(e -> {
+            String name = nameField.getText().trim();
+            String email = emailField.getText().trim();
+            String password = new String(passField.getPassword()).trim();
+            String dept = (String) deptBox.getSelectedItem();
+
+            if (name.isEmpty() || email.isEmpty() || password.isEmpty()) {
+                JOptionPane.showMessageDialog(dialog, "Please fill in all employee fields.", "Validation Error", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            Connection conn = null;
+            PreparedStatement checkEmailStmt = null;
+            PreparedStatement insertEmpStmt = null;
+            PreparedStatement getEmpIdStmt = null;
+            PreparedStatement insertBalStmt = null;
+            ResultSet rs = null;
+
+            try {
+                conn = DBConnection.getConnection();
+                conn.setAutoCommit(false); // Begin Transaction
+
+                // Check duplicate email
+                checkEmailStmt = conn.prepareStatement("SELECT email FROM EMPLOYEE WHERE email = ? UNION SELECT email FROM MANAGER WHERE email = ?");
+                checkEmailStmt.setString(1, email);
+                checkEmailStmt.setString(2, email);
+                rs = checkEmailStmt.executeQuery();
+                if (rs.next()) {
+                    JOptionPane.showMessageDialog(dialog, "An account with this email address already exists.", "Duplicate Email", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                // Insert Employee
+                String insertEmpSql = "INSERT INTO EMPLOYEE (employee_id, name, email, password, department, manager_id) " +
+                                      "VALUES (SEQ_EMPLOYEE_ID.NEXTVAL, ?, ?, ?, ?, ?)";
+                insertEmpStmt = conn.prepareStatement(insertEmpSql);
+                insertEmpStmt.setString(1, name);
+                insertEmpStmt.setString(2, email);
+                insertEmpStmt.setString(3, password);
+                insertEmpStmt.setString(4, dept);
+                insertEmpStmt.setInt(5, managerId);
+                insertEmpStmt.executeUpdate();
+
+                // Get the generated employee_id
+                getEmpIdStmt = conn.prepareStatement("SELECT SEQ_EMPLOYEE_ID.CURRVAL AS emp_id FROM dual");
+                rs = getEmpIdStmt.executeQuery();
+                int newEmpId = 0;
+                if (rs.next()) {
+                    newEmpId = rs.getInt("emp_id");
+                }
+
+                // Initialize standard leave balances (Casual: 12, Sick: 10, Earned: 15)
+                String insertBalSql = "INSERT INTO LEAVE_BALANCE (employee_id, leave_type_id, total_days, used_days, remaining_days) VALUES (?, ?, ?, 0, ?)";
+                insertBalStmt = conn.prepareStatement(insertBalSql);
+
+                // 1. Casual Leave (12 days)
+                insertBalStmt.setInt(1, newEmpId);
+                insertBalStmt.setInt(2, 1);
+                insertBalStmt.setInt(3, 12);
+                insertBalStmt.setInt(4, 12);
+                insertBalStmt.executeUpdate();
+
+                // 2. Sick Leave (10 days)
+                insertBalStmt.setInt(1, newEmpId);
+                insertBalStmt.setInt(2, 2);
+                insertBalStmt.setInt(3, 10);
+                insertBalStmt.setInt(4, 10);
+                insertBalStmt.executeUpdate();
+
+                // 3. Earned Leave (15 days)
+                insertBalStmt.setInt(1, newEmpId);
+                insertBalStmt.setInt(2, 3);
+                insertBalStmt.setInt(3, 15);
+                insertBalStmt.setInt(4, 15);
+                insertBalStmt.executeUpdate();
+
+                conn.commit(); // Commit Transaction
+
+                JOptionPane.showMessageDialog(dialog,
+                        "Employee Registered Successfully!\n\n" +
+                        "Employee ID: " + newEmpId + "\n" +
+                        "Name: " + name + "\n" +
+                        "Email: " + email + "\n" +
+                        "Department: " + dept + "\n" +
+                        "Reporting Manager: " + managerName + "\n" +
+                        "Default Leave Quota Initialized (37 Total Days).",
+                        "Registration Complete",
+                        JOptionPane.INFORMATION_MESSAGE);
+
+                dialog.dispose();
+                loadTeamEmployees();
+                tabbedPane.setSelectedIndex(2); // Switch to Team tab
+
+            } catch (SQLException ex) {
+                if (conn != null) {
+                    try { conn.rollback(); } catch (SQLException ignored) {}
+                }
+                JOptionPane.showMessageDialog(dialog, "Database Error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                ex.printStackTrace();
+            } finally {
+                try {
+                    if (rs != null) rs.close();
+                    if (checkEmailStmt != null) checkEmailStmt.close();
+                    if (insertEmpStmt != null) insertEmpStmt.close();
+                    if (getEmpIdStmt != null) getEmpIdStmt.close();
+                    if (insertBalStmt != null) insertBalStmt.close();
+                    if (conn != null) {
+                        conn.setAutoCommit(true);
+                        conn.close();
+                    }
+                } catch (SQLException ignored) {}
+            }
+        });
+
+        dialog.add(content);
+        dialog.setVisible(true);
     }
 }
