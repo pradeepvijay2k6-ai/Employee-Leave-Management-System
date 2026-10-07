@@ -93,7 +93,7 @@ CREATE TABLE LEAVE_REQUEST (
     end_date DATE NOT NULL,
     number_of_days NUMBER NOT NULL CHECK (number_of_days > 0),
     reason VARCHAR2(255) NOT NULL,
-    status VARCHAR2(20) DEFAULT 'PENDING' NOT NULL CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
+    status VARCHAR2(20) DEFAULT 'PENDING' NOT NULL CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')),
     applied_date DATE DEFAULT SYSDATE NOT NULL,
     CONSTRAINT fk_lr_employee FOREIGN KEY (employee_id) REFERENCES EMPLOYEE(employee_id) ON DELETE CASCADE,
     CONSTRAINT fk_lr_leavetype FOREIGN KEY (leave_type_id) REFERENCES LEAVE_TYPE(leave_type_id),

@@ -13,10 +13,11 @@ import java.sql.SQLException;
 
 /**
  * ManagerDashboard.java
- * Modern Manager Dashboard for:
- * 1. Reviewing and processing pending leave requests with ACID transactions.
- * 2. Viewing decision history.
- * 3. Viewing team members and adding new employees with automatic leave quota initialization.
+ * Modern Manager Dashboard supporting:
+ * 1. Pending leave review with ACID transactions & Half-Day support.
+ * 2. Decision history tracking.
+ * 3. Team management with new employee onboarding.
+ * 4. Year-end leave rollover and carry-forward calculation.
  */
 public class ManagerDashboard extends JFrame {
 
@@ -34,6 +35,7 @@ public class ManagerDashboard extends JFrame {
     private JButton approveButton;
     private JButton rejectButton;
     private JButton addEmployeeButton;
+    private JButton rolloverButton;
     private JButton refreshButton;
     private JButton logoutButton;
 
@@ -42,7 +44,7 @@ public class ManagerDashboard extends JFrame {
         this.managerName = managerName;
 
         setTitle("Manager Portal - " + managerName);
-        setSize(1080, 680);
+        setSize(1100, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         getContentPane().setBackground(new Color(248, 250, 252));
@@ -68,15 +70,28 @@ public class ManagerDashboard extends JFrame {
         welcomeLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
         welcomeLabel.setForeground(Color.WHITE);
 
-        JLabel subInfoLabel = new JLabel("Manager ID: #" + managerId + "  |  Team Management & Leave Approvals");
+        JLabel subInfoLabel = new JLabel("Manager ID: #" + managerId + "  |  Team Management, Leave Approvals & Rollovers");
         subInfoLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        subInfoLabel.setForeground(new Color(148, 163, 184)); // Slate 400
+        subInfoLabel.setForeground(new Color(148, 163, 184));
 
         profileInfo.add(welcomeLabel);
         profileInfo.add(subInfoLabel);
         headerCard.add(profileInfo, BorderLayout.WEST);
 
-        // Header Action: Add Employee quick button
+        // Header Action: Add Employee & Rollover buttons
+        JPanel headerBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        headerBtns.setOpaque(false);
+
+        rolloverButton = new JButton("⚡ Year-End Rollover");
+        rolloverButton.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        rolloverButton.setBackground(new Color(99, 102, 241)); // Indigo
+        rolloverButton.setForeground(Color.WHITE);
+        rolloverButton.setOpaque(true);
+        rolloverButton.setBorderPainted(false);
+        rolloverButton.setFocusPainted(false);
+        rolloverButton.setPreferredSize(new Dimension(170, 38));
+        rolloverButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
         addEmployeeButton = new JButton("+ Add Employee");
         addEmployeeButton.setFont(new Font("Segoe UI", Font.BOLD, 13));
         addEmployeeButton.setBackground(new Color(16, 185, 129)); // Emerald Green
@@ -86,7 +101,10 @@ public class ManagerDashboard extends JFrame {
         addEmployeeButton.setFocusPainted(false);
         addEmployeeButton.setPreferredSize(new Dimension(150, 38));
         addEmployeeButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        headerCard.add(addEmployeeButton, BorderLayout.EAST);
+
+        headerBtns.add(rolloverButton);
+        headerBtns.add(addEmployeeButton);
+        headerCard.add(headerBtns, BorderLayout.EAST);
 
         mainPanel.add(headerCard, BorderLayout.NORTH);
 
@@ -203,6 +221,9 @@ public class ManagerDashboard extends JFrame {
                     } else if ("REJECTED".equalsIgnoreCase(st)) {
                         lbl.setForeground(new Color(220, 38, 38));
                         lbl.setText("● REJECTED");
+                    } else if ("CANCELLED".equalsIgnoreCase(st)) {
+                        lbl.setForeground(new Color(100, 116, 139));
+                        lbl.setText("✕ CANCELLED");
                     }
                 }
                 return lbl;
@@ -286,40 +307,14 @@ public class ManagerDashboard extends JFrame {
         add(mainPanel);
 
         // Event Handlers
-        approveButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                processLeaveRequest(true);
-            }
-        });
-
-        rejectButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                processLeaveRequest(false);
-            }
-        });
-
-        addEmployeeButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                showAddEmployeeDialog();
-            }
-        });
-
-        refreshButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                loadAllData();
-            }
-        });
-
-        logoutButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                new Login().setVisible(true);
-                dispose();
-            }
+        approveButton.addActionListener(e -> processLeaveRequest(true));
+        rejectButton.addActionListener(e -> processLeaveRequest(false));
+        addEmployeeButton.addActionListener(e -> showAddEmployeeDialog());
+        rolloverButton.addActionListener(e -> performYearEndRollover());
+        refreshButton.addActionListener(e -> loadAllData());
+        logoutButton.addActionListener(e -> {
+            new Login().setVisible(true);
+            dispose();
         });
     }
 
@@ -356,7 +351,7 @@ public class ManagerDashboard extends JFrame {
                             rs.getInt("leave_type_id"),
                             rs.getDate("start_date").toString(),
                             rs.getDate("end_date").toString(),
-                            rs.getInt("number_of_days"),
+                            rs.getDouble("number_of_days"),
                             rs.getString("reason"),
                             rs.getDate("applied_date").toString()
                     });
@@ -377,7 +372,7 @@ public class ManagerDashboard extends JFrame {
                      "FROM LEAVE_REQUEST lr " +
                      "JOIN EMPLOYEE e ON lr.employee_id = e.employee_id " +
                      "JOIN LEAVE_TYPE lt ON lr.leave_type_id = lt.leave_type_id " +
-                     "WHERE e.manager_id = ? AND lr.status IN ('APPROVED', 'REJECTED') " +
+                     "WHERE e.manager_id = ? AND lr.status IN ('APPROVED', 'REJECTED', 'CANCELLED') " +
                      "ORDER BY lr.applied_date DESC";
 
         try (Connection conn = DBConnection.getConnection();
@@ -394,7 +389,7 @@ public class ManagerDashboard extends JFrame {
                             rs.getString("leave_type_name"),
                             rs.getDate("start_date").toString(),
                             rs.getDate("end_date").toString(),
-                            rs.getInt("number_of_days"),
+                            rs.getDouble("number_of_days"),
                             rs.getString("reason"),
                             rs.getString("status"),
                             rs.getDate("applied_date").toString()
@@ -429,9 +424,9 @@ public class ManagerDashboard extends JFrame {
                             rs.getString("name"),
                             rs.getString("email"),
                             rs.getString("department"),
-                            rs.getInt("casual_rem") + " days",
-                            rs.getInt("sick_rem") + " days",
-                            rs.getInt("earned_rem") + " days"
+                            rs.getDouble("casual_rem") + " days",
+                            rs.getDouble("sick_rem") + " days",
+                            rs.getDouble("earned_rem") + " days"
                     });
                 }
             }
@@ -456,7 +451,7 @@ public class ManagerDashboard extends JFrame {
         String empName = (String) pendingModel.getValueAt(selectedRow, 2);
         String leaveTypeName = (String) pendingModel.getValueAt(selectedRow, 4);
         int leaveTypeId = (int) pendingModel.getValueAt(selectedRow, 5);
-        int days = (int) pendingModel.getValueAt(selectedRow, 8);
+        double days = (double) pendingModel.getValueAt(selectedRow, 8);
 
         String actionWord = isApprove ? "APPROVE" : "REJECT";
         int confirm = JOptionPane.showConfirmDialog(this,
@@ -487,7 +482,7 @@ public class ManagerDashboard extends JFrame {
                 rs = checkBalanceStmt.executeQuery();
 
                 if (rs.next()) {
-                    int remaining = rs.getInt("remaining_days");
+                    double remaining = rs.getDouble("remaining_days");
                     if (days > remaining) {
                         conn.rollback();
                         JOptionPane.showMessageDialog(this,
@@ -518,8 +513,8 @@ public class ManagerDashboard extends JFrame {
                 String updateBalSql = "UPDATE LEAVE_BALANCE SET used_days = used_days + ?, remaining_days = remaining_days - ? " +
                                       "WHERE employee_id = ? AND leave_type_id = ?";
                 updateBalanceStmt = conn.prepareStatement(updateBalSql);
-                updateBalanceStmt.setInt(1, days);
-                updateBalanceStmt.setInt(2, days);
+                updateBalanceStmt.setDouble(1, days);
+                updateBalanceStmt.setDouble(2, days);
                 updateBalanceStmt.setInt(3, empId);
                 updateBalanceStmt.setInt(4, leaveTypeId);
                 updateBalanceStmt.executeUpdate();
@@ -557,11 +552,7 @@ public class ManagerDashboard extends JFrame {
 
         } catch (SQLException ex) {
             if (conn != null) {
-                try {
-                    conn.rollback();
-                } catch (SQLException rbEx) {
-                    rbEx.printStackTrace();
-                }
+                try { conn.rollback(); } catch (SQLException ignored) {}
             }
             JOptionPane.showMessageDialog(this,
                     "Transaction Failed: " + ex.getMessage() + "\nAll changes have been rolled back.",
@@ -582,10 +573,6 @@ public class ManagerDashboard extends JFrame {
         }
     }
 
-    /**
-     * Opens modal dialog to register a new employee under this manager
-     * and automatically initialize their leave balances via a transaction.
-     */
     private void showAddEmployeeDialog() {
         JDialog dialog = new JDialog(this, "Add New Employee", true);
         dialog.setSize(480, 420);
@@ -676,7 +663,6 @@ public class ManagerDashboard extends JFrame {
                 conn = DBConnection.getConnection();
                 conn.setAutoCommit(false); // Begin Transaction
 
-                // Check duplicate email
                 checkEmailStmt = conn.prepareStatement("SELECT email FROM EMPLOYEE WHERE email = ? UNION SELECT email FROM MANAGER WHERE email = ?");
                 checkEmailStmt.setString(1, email);
                 checkEmailStmt.setString(2, email);
@@ -686,7 +672,6 @@ public class ManagerDashboard extends JFrame {
                     return;
                 }
 
-                // Insert Employee
                 String insertEmpSql = "INSERT INTO EMPLOYEE (employee_id, name, email, password, department, manager_id) " +
                                       "VALUES (SEQ_EMPLOYEE_ID.NEXTVAL, ?, ?, ?, ?, ?)";
                 insertEmpStmt = conn.prepareStatement(insertEmpSql);
@@ -697,7 +682,6 @@ public class ManagerDashboard extends JFrame {
                 insertEmpStmt.setInt(5, managerId);
                 insertEmpStmt.executeUpdate();
 
-                // Get the generated employee_id
                 getEmpIdStmt = conn.prepareStatement("SELECT SEQ_EMPLOYEE_ID.CURRVAL AS emp_id FROM dual");
                 rs = getEmpIdStmt.executeQuery();
                 int newEmpId = 0;
@@ -705,32 +689,32 @@ public class ManagerDashboard extends JFrame {
                     newEmpId = rs.getInt("emp_id");
                 }
 
-                // Initialize standard leave balances (Casual: 12, Sick: 10, Earned: 15)
+                // Default balances
                 String insertBalSql = "INSERT INTO LEAVE_BALANCE (employee_id, leave_type_id, total_days, used_days, remaining_days) VALUES (?, ?, ?, 0, ?)";
                 insertBalStmt = conn.prepareStatement(insertBalSql);
 
-                // 1. Casual Leave (12 days)
+                // Casual
                 insertBalStmt.setInt(1, newEmpId);
                 insertBalStmt.setInt(2, 1);
-                insertBalStmt.setInt(3, 12);
-                insertBalStmt.setInt(4, 12);
+                insertBalStmt.setDouble(3, 12.0);
+                insertBalStmt.setDouble(4, 12.0);
                 insertBalStmt.executeUpdate();
 
-                // 2. Sick Leave (10 days)
+                // Sick
                 insertBalStmt.setInt(1, newEmpId);
                 insertBalStmt.setInt(2, 2);
-                insertBalStmt.setInt(3, 10);
-                insertBalStmt.setInt(4, 10);
+                insertBalStmt.setDouble(3, 10.0);
+                insertBalStmt.setDouble(4, 10.0);
                 insertBalStmt.executeUpdate();
 
-                // 3. Earned Leave (15 days)
+                // Earned
                 insertBalStmt.setInt(1, newEmpId);
                 insertBalStmt.setInt(2, 3);
-                insertBalStmt.setInt(3, 15);
-                insertBalStmt.setInt(4, 15);
+                insertBalStmt.setDouble(3, 15.0);
+                insertBalStmt.setDouble(4, 15.0);
                 insertBalStmt.executeUpdate();
 
-                conn.commit(); // Commit Transaction
+                conn.commit();
 
                 JOptionPane.showMessageDialog(dialog,
                         "Employee Registered Successfully!\n\n" +
@@ -739,13 +723,13 @@ public class ManagerDashboard extends JFrame {
                         "Email: " + email + "\n" +
                         "Department: " + dept + "\n" +
                         "Reporting Manager: " + managerName + "\n" +
-                        "Default Leave Quota Initialized (37 Total Days).",
+                        "Default Leave Quota Initialized.",
                         "Registration Complete",
                         JOptionPane.INFORMATION_MESSAGE);
 
                 dialog.dispose();
                 loadTeamEmployees();
-                tabbedPane.setSelectedIndex(2); // Switch to Team tab
+                tabbedPane.setSelectedIndex(2);
 
             } catch (SQLException ex) {
                 if (conn != null) {
@@ -770,5 +754,79 @@ public class ManagerDashboard extends JFrame {
 
         dialog.add(content);
         dialog.setVisible(true);
+    }
+
+    /**
+     * Executes annual leave rollover for all employees under this manager using a JDBC transaction.
+     */
+    private void performYearEndRollover() {
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Execute Annual Year-End Leave Rollover for your team?\n\n" +
+                "• Casual Leave: Resets to 12 days quota.\n" +
+                "• Sick Leave: Resets to 10 days quota.\n" +
+                "• Earned Leave: Remaining balance carries forward (+15 new days, max 30 days cap).\n\n" +
+                "This action applies to all reporting team members.",
+                "Confirm Year-End Rollover",
+                JOptionPane.YES_NO_OPTION);
+
+        if (confirm != JOptionPane.YES_OPTION) return;
+
+        Connection conn = null;
+        PreparedStatement stmtCasual = null;
+        PreparedStatement stmtSick = null;
+        PreparedStatement stmtEarned = null;
+
+        try {
+            conn = DBConnection.getConnection();
+            conn.setAutoCommit(false); // Begin Transaction
+
+            // 1. Reset Casual Leaves
+            String sqlCasual = "UPDATE LEAVE_BALANCE SET total_days = 12, used_days = 0, remaining_days = 12 " +
+                               "WHERE employee_id IN (SELECT employee_id FROM EMPLOYEE WHERE manager_id = ?) AND leave_type_id = 1";
+            stmtCasual = conn.prepareStatement(sqlCasual);
+            stmtCasual.setInt(1, managerId);
+            stmtCasual.executeUpdate();
+
+            // 2. Reset Sick Leaves
+            String sqlSick = "UPDATE LEAVE_BALANCE SET total_days = 10, used_days = 0, remaining_days = 10 " +
+                             "WHERE employee_id IN (SELECT employee_id FROM EMPLOYEE WHERE manager_id = ?) AND leave_type_id = 2";
+            stmtSick = conn.prepareStatement(sqlSick);
+            stmtSick.setInt(1, managerId);
+            stmtSick.executeUpdate();
+
+            // 3. Carry forward Earned Leaves with max cap 30
+            String sqlEarned = "UPDATE LEAVE_BALANCE SET total_days = LEAST(remaining_days + 15, 30), used_days = 0, remaining_days = LEAST(remaining_days + 15, 30) " +
+                               "WHERE employee_id IN (SELECT employee_id FROM EMPLOYEE WHERE manager_id = ?) AND leave_type_id = 3";
+            stmtEarned = conn.prepareStatement(sqlEarned);
+            stmtEarned.setInt(1, managerId);
+            stmtEarned.executeUpdate();
+
+            conn.commit(); // Commit Transaction
+
+            JOptionPane.showMessageDialog(this,
+                    "Annual Leave Rollover Completed Successfully!\nAll team leave quotas have been updated.",
+                    "Rollover Complete",
+                    JOptionPane.INFORMATION_MESSAGE);
+
+            loadAllData();
+            tabbedPane.setSelectedIndex(2);
+
+        } catch (SQLException ex) {
+            if (conn != null) {
+                try { conn.rollback(); } catch (SQLException ignored) {}
+            }
+            JOptionPane.showMessageDialog(this, "Rollover Failed: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            ex.printStackTrace();
+        } finally {
+            try {
+                if (stmtCasual != null) stmtCasual.close();
+                if (stmtSick != null) stmtSick.close();
+                if (stmtEarned != null) stmtEarned.close();
+                if (conn != null) {
+                    conn.setAutoCommit(true);
+                    conn.close();
+                }
+            } catch (SQLException ignored) {}
+        }
     }
 }

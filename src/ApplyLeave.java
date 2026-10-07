@@ -16,7 +16,7 @@ import java.text.SimpleDateFormat;
 
 /**
  * ApplyLeave.java
- * Form screen for submitting leave applications with automatic day calculation and quota validation.
+ * Screen for employees to submit leave applications with support for Full-Day and Half-Day (0.5) requests.
  */
 public class ApplyLeave extends JFrame {
 
@@ -25,6 +25,7 @@ public class ApplyLeave extends JFrame {
     private EmployeeDashboard parentDashboard;
 
     private JComboBox<LeaveTypeItem> leaveTypeComboBox;
+    private JCheckBox halfDayCheckBox;
     private JTextField startDateField;
     private JTextField endDateField;
     private JTextField daysField;
@@ -54,7 +55,7 @@ public class ApplyLeave extends JFrame {
         this.parentDashboard = parentDashboard;
 
         setTitle("Apply for Leave - " + employeeName);
-        setSize(540, 540);
+        setSize(540, 580);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(parentDashboard);
         setResizable(false);
@@ -65,7 +66,7 @@ public class ApplyLeave extends JFrame {
     }
 
     private void initComponents() {
-        JPanel mainPanel = new JPanel(new BorderLayout(0, 18));
+        JPanel mainPanel = new JPanel(new BorderLayout(0, 16));
         mainPanel.setBackground(new Color(248, 250, 252));
         mainPanel.setBorder(new EmptyBorder(20, 25, 20, 25));
 
@@ -77,7 +78,7 @@ public class ApplyLeave extends JFrame {
         titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
         titleLabel.setForeground(new Color(15, 23, 42));
 
-        JLabel subLabel = new JLabel("Fill in the dates and reason below for manager review.");
+        JLabel subLabel = new JLabel("Supports Full Day and Half-Day (0.5) leave requests.");
         subLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         subLabel.setForeground(new Color(100, 116, 139));
 
@@ -94,7 +95,7 @@ public class ApplyLeave extends JFrame {
         ));
 
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(7, 7, 7, 7);
+        gbc.insets = new Insets(6, 7, 6, 7);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
         // Leave Type
@@ -110,13 +111,21 @@ public class ApplyLeave extends JFrame {
         leaveTypeComboBox.setPreferredSize(new Dimension(200, 32));
         formCard.add(leaveTypeComboBox, gbc);
 
+        // Half Day Option Checkbox
+        gbc.gridx = 1; gbc.gridy = 1;
+        halfDayCheckBox = new JCheckBox("Half-Day Leave (0.5 Days)");
+        halfDayCheckBox.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        halfDayCheckBox.setForeground(new Color(37, 99, 235));
+        halfDayCheckBox.setOpaque(false);
+        formCard.add(halfDayCheckBox, gbc);
+
         // Start Date
-        gbc.gridx = 0; gbc.gridy = 1;
+        gbc.gridx = 0; gbc.gridy = 2;
         JLabel startLbl = new JLabel("Start Date (YYYY-MM-DD):");
         startLbl.setFont(new Font("Segoe UI", Font.BOLD, 13));
         formCard.add(startLbl, gbc);
 
-        gbc.gridx = 1; gbc.gridy = 1;
+        gbc.gridx = 1; gbc.gridy = 2;
         startDateField = new JTextField();
         startDateField.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         startDateField.setPreferredSize(new Dimension(200, 32));
@@ -127,12 +136,12 @@ public class ApplyLeave extends JFrame {
         formCard.add(startDateField, gbc);
 
         // End Date
-        gbc.gridx = 0; gbc.gridy = 2;
+        gbc.gridx = 0; gbc.gridy = 3;
         JLabel endLbl = new JLabel("End Date (YYYY-MM-DD):");
         endLbl.setFont(new Font("Segoe UI", Font.BOLD, 13));
         formCard.add(endLbl, gbc);
 
-        gbc.gridx = 1; gbc.gridy = 2;
+        gbc.gridx = 1; gbc.gridy = 3;
         endDateField = new JTextField();
         endDateField.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         endDateField.setPreferredSize(new Dimension(200, 32));
@@ -143,12 +152,12 @@ public class ApplyLeave extends JFrame {
         formCard.add(endDateField, gbc);
 
         // Calculated Days
-        gbc.gridx = 0; gbc.gridy = 3;
+        gbc.gridx = 0; gbc.gridy = 4;
         JLabel daysLbl = new JLabel("Calculated Days:");
         daysLbl.setFont(new Font("Segoe UI", Font.BOLD, 13));
         formCard.add(daysLbl, gbc);
 
-        gbc.gridx = 1; gbc.gridy = 3;
+        gbc.gridx = 1; gbc.gridy = 4;
         JPanel daysPanel = new JPanel(new BorderLayout(8, 0));
         daysPanel.setOpaque(false);
 
@@ -173,12 +182,12 @@ public class ApplyLeave extends JFrame {
         formCard.add(daysPanel, gbc);
 
         // Reason
-        gbc.gridx = 0; gbc.gridy = 4;
+        gbc.gridx = 0; gbc.gridy = 5;
         JLabel reasonLbl = new JLabel("Reason for Leave:");
         reasonLbl.setFont(new Font("Segoe UI", Font.BOLD, 13));
         formCard.add(reasonLbl, gbc);
 
-        gbc.gridx = 1; gbc.gridy = 4;
+        gbc.gridx = 1; gbc.gridy = 5;
         reasonArea = new JTextArea(3, 15);
         reasonArea.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         reasonArea.setLineWrap(true);
@@ -196,7 +205,7 @@ public class ApplyLeave extends JFrame {
 
         submitButton = new JButton("Submit Application");
         submitButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        submitButton.setBackground(new Color(16, 185, 129)); // Emerald Green
+        submitButton.setBackground(new Color(16, 185, 129));
         submitButton.setForeground(Color.WHITE);
         submitButton.setOpaque(true);
         submitButton.setBorderPainted(false);
@@ -220,34 +229,42 @@ public class ApplyLeave extends JFrame {
 
         add(mainPanel);
 
-        // Events
-        calculateButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
+        // Half Day toggled listener
+        halfDayCheckBox.addActionListener(e -> {
+            if (halfDayCheckBox.isSelected()) {
+                endDateField.setText(startDateField.getText().trim());
+                endDateField.setEnabled(false);
+                daysField.setText("0.5");
+            } else {
+                endDateField.setEnabled(true);
                 calculateDays();
+            }
+        });
+
+        // Events
+        calculateButton.addActionListener(e -> calculateDays());
+
+        startDateField.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusLost(FocusEvent e) {
+                if (halfDayCheckBox.isSelected()) {
+                    endDateField.setText(startDateField.getText().trim());
+                    daysField.setText("0.5");
+                }
             }
         });
 
         endDateField.addFocusListener(new FocusAdapter() {
             @Override
             public void focusLost(FocusEvent e) {
-                calculateDays();
+                if (!halfDayCheckBox.isSelected()) {
+                    calculateDays();
+                }
             }
         });
 
-        submitButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                submitApplication();
-            }
-        });
-
-        cancelButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                dispose();
-            }
-        });
+        submitButton.addActionListener(e -> submitApplication());
+        cancelButton.addActionListener(e -> dispose());
     }
 
     private void loadLeaveTypes() {
@@ -268,7 +285,12 @@ public class ApplyLeave extends JFrame {
         }
     }
 
-    private int calculateDays() {
+    private double calculateDays() {
+        if (halfDayCheckBox.isSelected()) {
+            daysField.setText("0.5");
+            return 0.5;
+        }
+
         String startStr = startDateField.getText().trim();
         String endStr = endDateField.getText().trim();
 
@@ -291,9 +313,9 @@ public class ApplyLeave extends JFrame {
             }
 
             long diffInMillis = endDate.getTime() - startDate.getTime();
-            int days = (int) (diffInMillis / (1000 * 60 * 60 * 24)) + 1;
+            double days = (diffInMillis / (1000.0 * 60 * 60 * 24)) + 1.0;
 
-            daysField.setText(String.valueOf(days));
+            daysField.setText(String.valueOf((int) days));
             return days;
         } catch (ParseException ex) {
             JOptionPane.showMessageDialog(this, "Please enter dates in valid YYYY-MM-DD format!", "Invalid Date Format", JOptionPane.WARNING_MESSAGE);
@@ -309,13 +331,21 @@ public class ApplyLeave extends JFrame {
             return;
         }
 
-        int days = calculateDays();
+        if (halfDayCheckBox.isSelected()) {
+            endDateField.setText(startDateField.getText().trim());
+        }
+
+        double days = calculateDays();
         if (days <= 0) return;
 
         String reason = reasonArea.getText().trim();
         if (reason.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Please provide a reason for the leave application.", "Validation Error", JOptionPane.WARNING_MESSAGE);
             return;
+        }
+
+        if (halfDayCheckBox.isSelected()) {
+            reason = "[Half-Day] " + reason;
         }
 
         String startStr = startDateField.getText().trim();
@@ -337,7 +367,7 @@ public class ApplyLeave extends JFrame {
             rs = checkStmt.executeQuery();
 
             if (rs.next()) {
-                int remainingDays = rs.getInt("remaining_days");
+                double remainingDays = rs.getDouble("remaining_days");
 
                 if (days > remainingDays) {
                     JOptionPane.showMessageDialog(this,
@@ -353,7 +383,7 @@ public class ApplyLeave extends JFrame {
                 return;
             }
 
-            // 2. Insert with SEQ_REQUEST_ID.NEXTVAL
+            // 2. Insert into LEAVE_REQUEST
             String insertSql = "INSERT INTO LEAVE_REQUEST " +
                     "(request_id, employee_id, leave_type_id, start_date, end_date, number_of_days, reason, status, applied_date) " +
                     "VALUES (SEQ_REQUEST_ID.NEXTVAL, ?, ?, ?, ?, ?, ?, 'PENDING', SYSDATE)";
@@ -363,13 +393,13 @@ public class ApplyLeave extends JFrame {
             insertStmt.setInt(2, selectedType.id);
             insertStmt.setDate(3, Date.valueOf(startStr));
             insertStmt.setDate(4, Date.valueOf(endStr));
-            insertStmt.setInt(5, days);
+            insertStmt.setDouble(5, days);
             insertStmt.setString(6, reason);
 
             int rows = insertStmt.executeUpdate();
             if (rows > 0) {
                 JOptionPane.showMessageDialog(this,
-                        "Leave application submitted successfully!\nStatus: PENDING manager review.",
+                        "Leave application submitted successfully!\nDays Requested: " + days + " day(s)\nStatus: PENDING manager review.",
                         "Application Submitted",
                         JOptionPane.INFORMATION_MESSAGE);
 

@@ -13,7 +13,7 @@ import java.sql.SQLException;
 
 /**
  * LeaveHistory.java
- * Displays past and current leave requests with stylized status badges.
+ * Displays employee leave requests and enables self-cancellation for pending applications.
  */
 public class LeaveHistory extends JFrame {
 
@@ -22,6 +22,7 @@ public class LeaveHistory extends JFrame {
 
     private JTable historyTable;
     private DefaultTableModel tableModel;
+    private JButton cancelReqButton;
     private JButton refreshButton;
     private JButton closeButton;
 
@@ -30,7 +31,7 @@ public class LeaveHistory extends JFrame {
         this.employeeName = employeeName;
 
         setTitle("Leave Application History - " + employeeName);
-        setSize(920, 520);
+        setSize(960, 540);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
         getContentPane().setBackground(new Color(248, 250, 252));
@@ -52,7 +53,7 @@ public class LeaveHistory extends JFrame {
         titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
         titleLabel.setForeground(new Color(15, 23, 42));
 
-        JLabel subLabel = new JLabel("Track the approval status of all your submitted leave applications.");
+        JLabel subLabel = new JLabel("Track status or cancel any of your PENDING leave applications.");
         subLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         subLabel.setForeground(new Color(100, 116, 139));
 
@@ -81,13 +82,16 @@ public class LeaveHistory extends JFrame {
         historyTable.setRowHeight(32);
         historyTable.setShowVerticalLines(false);
         historyTable.setGridColor(new Color(241, 245, 249));
+        historyTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        historyTable.setSelectionBackground(new Color(224, 231, 255));
+        historyTable.setSelectionForeground(Color.BLACK);
 
         historyTable.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 12));
         historyTable.getTableHeader().setBackground(new Color(30, 41, 59));
         historyTable.getTableHeader().setForeground(Color.WHITE);
         historyTable.getTableHeader().setPreferredSize(new Dimension(0, 34));
 
-        // Set column widths
+        // Column widths
         historyTable.getColumnModel().getColumn(0).setMaxWidth(65);
         historyTable.getColumnModel().getColumn(4).setMaxWidth(65);
 
@@ -110,6 +114,9 @@ public class LeaveHistory extends JFrame {
                     } else if ("PENDING".equalsIgnoreCase(status)) {
                         lbl.setForeground(new Color(217, 119, 6)); // Amber
                         lbl.setText("⏳ PENDING");
+                    } else if ("CANCELLED".equalsIgnoreCase(status)) {
+                        lbl.setForeground(new Color(100, 116, 139)); // Slate
+                        lbl.setText("✕ CANCELLED");
                     }
                 }
                 return lbl;
@@ -124,6 +131,16 @@ public class LeaveHistory extends JFrame {
         // Bottom Controls
         JPanel bottomBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
         bottomBar.setBackground(new Color(248, 250, 252));
+
+        cancelReqButton = new JButton("✕ Cancel Selected Request");
+        cancelReqButton.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        cancelReqButton.setBackground(new Color(239, 68, 68));
+        cancelReqButton.setForeground(Color.WHITE);
+        cancelReqButton.setOpaque(true);
+        cancelReqButton.setBorderPainted(false);
+        cancelReqButton.setFocusPainted(false);
+        cancelReqButton.setPreferredSize(new Dimension(200, 36));
+        cancelReqButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
         refreshButton = new JButton("Refresh");
         refreshButton.setFont(new Font("Segoe UI", Font.BOLD, 13));
@@ -145,25 +162,17 @@ public class LeaveHistory extends JFrame {
         closeButton.setPreferredSize(new Dimension(100, 36));
         closeButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
+        bottomBar.add(cancelReqButton);
         bottomBar.add(refreshButton);
         bottomBar.add(closeButton);
         mainPanel.add(bottomBar, BorderLayout.SOUTH);
 
         add(mainPanel);
 
-        refreshButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                loadHistory();
-            }
-        });
-
-        closeButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                dispose();
-            }
-        });
+        // Events
+        cancelReqButton.addActionListener(e -> cancelSelectedRequest());
+        refreshButton.addActionListener(e -> loadHistory());
+        closeButton.addActionListener(e -> dispose());
     }
 
     private void loadHistory() {
@@ -187,7 +196,7 @@ public class LeaveHistory extends JFrame {
                             rs.getString("leave_type_name"),
                             rs.getDate("start_date").toString(),
                             rs.getDate("end_date").toString(),
-                            rs.getInt("number_of_days"),
+                            rs.getDouble("number_of_days"),
                             rs.getString("reason"),
                             rs.getString("status"),
                             rs.getDate("applied_date").toString()
@@ -197,6 +206,48 @@ public class LeaveHistory extends JFrame {
 
         } catch (SQLException ex) {
             JOptionPane.showMessageDialog(this, "Error loading history: " + ex.getMessage(), "Database Error", JOptionPane.ERROR_MESSAGE);
+            ex.printStackTrace();
+        }
+    }
+
+    private void cancelSelectedRequest() {
+        int selectedRow = historyTable.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Please select a leave request from the table to cancel.", "Selection Required", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int requestId = (int) tableModel.getValueAt(selectedRow, 0);
+        String status = (String) tableModel.getValueAt(selectedRow, 6);
+
+        if (!"PENDING".equalsIgnoreCase(status)) {
+            JOptionPane.showMessageDialog(this, "Only PENDING requests can be cancelled. Status is currently: " + status, "Cannot Cancel", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Are you sure you want to cancel Leave Request #" + requestId + "?",
+                "Confirm Cancellation",
+                JOptionPane.YES_NO_OPTION);
+
+        if (confirm != JOptionPane.YES_OPTION) return;
+
+        String sql = "UPDATE LEAVE_REQUEST SET status = 'CANCELLED' WHERE request_id = ? AND employee_id = ? AND status = 'PENDING'";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, requestId);
+            pstmt.setInt(2, employeeId);
+            int rows = pstmt.executeUpdate();
+
+            if (rows > 0) {
+                JOptionPane.showMessageDialog(this, "Leave Request #" + requestId + " has been CANCELLED.", "Cancelled", JOptionPane.INFORMATION_MESSAGE);
+                loadHistory();
+            } else {
+                JOptionPane.showMessageDialog(this, "Request could not be cancelled or is no longer pending.", "Notice", JOptionPane.WARNING_MESSAGE);
+            }
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Database error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             ex.printStackTrace();
         }
     }

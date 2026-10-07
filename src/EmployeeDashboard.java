@@ -13,7 +13,7 @@ import java.sql.SQLException;
 
 /**
  * EmployeeDashboard.java
- * Modern Employee Dashboard with leave quota cards, styled balance table, and quick actions.
+ * Modern Employee Dashboard with live quota summary, leave application, and self-cancellation tracking.
  */
 public class EmployeeDashboard extends JFrame {
 
@@ -34,7 +34,7 @@ public class EmployeeDashboard extends JFrame {
         this.department = department;
 
         setTitle("Employee Portal - " + employeeName);
-        setSize(860, 560);
+        setSize(880, 560);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         getContentPane().setBackground(new Color(248, 250, 252));
@@ -62,7 +62,7 @@ public class EmployeeDashboard extends JFrame {
 
         JLabel subInfoLabel = new JLabel("Employee ID: #" + employeeId + "  |  Department: " + department);
         subInfoLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        subInfoLabel.setForeground(new Color(148, 163, 184)); // Slate 400
+        subInfoLabel.setForeground(new Color(148, 163, 184));
 
         profileInfo.add(welcomeLabel);
         profileInfo.add(subInfoLabel);
@@ -71,7 +71,7 @@ public class EmployeeDashboard extends JFrame {
         // Apply quick button in header
         applyLeaveButton = new JButton("+ Apply Leave");
         applyLeaveButton.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        applyLeaveButton.setBackground(new Color(16, 185, 129)); // Emerald Green
+        applyLeaveButton.setBackground(new Color(16, 185, 129));
         applyLeaveButton.setForeground(Color.WHITE);
         applyLeaveButton.setOpaque(true);
         applyLeaveButton.setBorderPainted(false);
@@ -111,13 +111,11 @@ public class EmployeeDashboard extends JFrame {
         balanceTable.setSelectionBackground(new Color(224, 231, 255));
         balanceTable.setSelectionForeground(Color.BLACK);
 
-        // Custom Header
         balanceTable.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 13));
         balanceTable.getTableHeader().setBackground(new Color(30, 41, 59));
         balanceTable.getTableHeader().setForeground(Color.WHITE);
         balanceTable.getTableHeader().setPreferredSize(new Dimension(0, 36));
 
-        // Center align numbers and custom remaining column styling
         DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
         centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
         balanceTable.getColumnModel().getColumn(1).setCellRenderer(centerRenderer);
@@ -129,7 +127,7 @@ public class EmployeeDashboard extends JFrame {
                 Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
                 setHorizontalAlignment(SwingConstants.CENTER);
                 setFont(getFont().deriveFont(Font.BOLD, 14f));
-                setForeground(new Color(5, 150, 105)); // Green highlight for balance
+                setForeground(new Color(5, 150, 105));
                 return c;
             }
         });
@@ -140,13 +138,13 @@ public class EmployeeDashboard extends JFrame {
 
         mainPanel.add(tableCard, BorderLayout.CENTER);
 
-        // 3. Bottom Action Controls
+        // 3. Bottom Controls
         JPanel bottomBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
         bottomBar.setBackground(new Color(248, 250, 252));
 
         viewHistoryButton = new JButton("View My Leave History");
         viewHistoryButton.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        viewHistoryButton.setBackground(new Font("Segoe UI", Font.PLAIN, 13) != null ? new Color(79, 70, 229) : Color.BLUE); // Indigo
+        viewHistoryButton.setBackground(new Color(79, 70, 229));
         viewHistoryButton.setForeground(Color.WHITE);
         viewHistoryButton.setOpaque(true);
         viewHistoryButton.setBorderPainted(false);
@@ -156,7 +154,7 @@ public class EmployeeDashboard extends JFrame {
 
         refreshButton = new JButton("Refresh");
         refreshButton.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        refreshButton.setBackground(new Color(14, 165, 233)); // Sky Blue
+        refreshButton.setBackground(new Color(14, 165, 233));
         refreshButton.setForeground(Color.WHITE);
         refreshButton.setOpaque(true);
         refreshButton.setBorderPainted(false);
@@ -166,7 +164,7 @@ public class EmployeeDashboard extends JFrame {
 
         logoutButton = new JButton("Logout");
         logoutButton.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        logoutButton.setBackground(new Color(220, 38, 38)); // Red
+        logoutButton.setBackground(new Color(220, 38, 38));
         logoutButton.setForeground(Color.WHITE);
         logoutButton.setOpaque(true);
         logoutButton.setBorderPainted(false);
@@ -182,34 +180,13 @@ public class EmployeeDashboard extends JFrame {
 
         add(mainPanel);
 
-        // Action Handlers
-        applyLeaveButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                new ApplyLeave(employeeId, employeeName, EmployeeDashboard.this).setVisible(true);
-            }
-        });
-
-        viewHistoryButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                new LeaveHistory(employeeId, employeeName).setVisible(true);
-            }
-        });
-
-        refreshButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                loadLeaveBalances();
-            }
-        });
-
-        logoutButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                new Login().setVisible(true);
-                dispose();
-            }
+        // Events
+        applyLeaveButton.addActionListener(e -> new ApplyLeave(employeeId, employeeName, EmployeeDashboard.this).setVisible(true));
+        viewHistoryButton.addActionListener(e -> new LeaveHistory(employeeId, employeeName).setVisible(true));
+        refreshButton.addActionListener(e -> loadLeaveBalances());
+        logoutButton.addActionListener(e -> {
+            new Login().setVisible(true);
+            dispose();
         });
     }
 
@@ -229,11 +206,15 @@ public class EmployeeDashboard extends JFrame {
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
                     String type = rs.getString("leave_type_name");
-                    int total = rs.getInt("total_days");
-                    int used = rs.getInt("used_days");
-                    int remaining = rs.getInt("remaining_days");
+                    double total = rs.getDouble("total_days");
+                    double used = rs.getDouble("used_days");
+                    double remaining = rs.getDouble("remaining_days");
 
-                    tableModel.addRow(new Object[]{type, total, used, remaining});
+                    String totalStr = (total == (int) total) ? String.valueOf((int) total) : String.valueOf(total);
+                    String usedStr = (used == (int) used) ? String.valueOf((int) used) : String.valueOf(used);
+                    String remStr = (remaining == (int) remaining) ? String.valueOf((int) remaining) : String.valueOf(remaining);
+
+                    tableModel.addRow(new Object[]{type, totalStr, usedStr, remStr});
                 }
             }
         } catch (SQLException ex) {
